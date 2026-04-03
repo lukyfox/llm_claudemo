@@ -1,0 +1,6 @@
+anthropic
+gradio
+ipython
+pandas
+python-docx
+python-dotenv
