@@ -1,13 +1,12 @@
 import json
-from typing import Any
 
-from anthropic._exceptions import OverloadedError, RateLimitError
-from anthropic.types import ToolParam, TextBlock, ToolUseBlock
+from anthropic._exceptions import RateLimitError
+from anthropic.types import ToolParam, ToolUseBlock
 
 
 from .file_processor import FileProcessor
 from .anthropic_ext import AnthropicExt
-from time import sleep
+from .config import Config
 
 
 class ClaudeChat:
@@ -77,15 +76,23 @@ class ClaudeChat:
         self.messages.append({'role': role, 'content': message})
 
     def set_system_message(self, message: str=None):
+        """
+        Join rules to system message, use default message when custom message not given (is None)
+        :param message: system prompt
+        :return:
+        """
         if not message:
             message = "You are a helpful assistant."
-        with open(file="data/rule.json", mode="r", encoding="utf-8") as f:
+        with open(file=Config.RULE_FILE_PATH, mode="r", encoding="utf-8") as f:
             rules = json.load(f)
             rules = '\n'.join(rules)
             message += '\n' + rules
         self.system_message = message
 
-    def make_chat_round(self, repeated=0):
+    def make_chat_round(self):
+        """
+        Run conversation - process user and assistant messages, keep history and process tools.
+        """
         try:
             chat = self.client.messages.create(
                 model=self.model,
@@ -109,21 +116,16 @@ class ClaudeChat:
                     model=self.model,
                     max_tokens=1024,
                     tools=self.tools,
+                    system=self.system_message,
                     messages=self.messages + tool_exchange
                 )
-
             response_text = "".join([item.text for item in chat.content if item.type == 'text'])
             self.add_message(chat.role, response_text)
-        except OverloadedError as e:
-            if repeated > 2:
-                raise Exception(f"Several attempts to process message failed due to OverloadedError: " + e.message)
-            sleep(1)
-            repeated += 1
-            self.make_chat_round(repeated)
         except RateLimitError as e:
             self.add_message(
                 "assistant",
             "Rate limit exceeded. Please try again later or reduce length of your prompt or restart conversation.")
+
 
     def set_model_id(self, model_id = None):
         """
@@ -147,13 +149,15 @@ class ClaudeChat:
         return self.model
 
     def __str__(self):
-        return f"{self.messages[-1]['role']}: {self.messages[-1]['content']}"
+        if len(self.messages) > 0:
+            return f"{self.messages[-1]['role']}: {self.messages[-1]['content']}"
+        return "assistant: Conversation has not started yet. Send your first message to get started."
 
-    def handle_tool_calls(self, tool_call) -> list[dict[str, Any]]:
+    def handle_tool_calls(self, tool_call) -> dict:
         """
-
-        :param tool_call:
-        :return:
+        Handle any user tool call (built-ins are solved by API separately)
+        :param tool_call: ToolUseBlock from chat messages
+        :return: dict of tool results
         """
         responses = {"role": 'user', "content": []}
         func_res = None

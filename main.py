@@ -1,3 +1,4 @@
+import gradio as gr
 import os
 
 from dotenv import load_dotenv
@@ -17,4 +18,4 @@ if __name__=='__main__':
     # initialize Gradio GUI
     gui = UserInterface(chat)
     # run it all together
-    gui.build_gui().launch(theme='ocean')
+    gui.build_gui().launch()

@@ -2,10 +2,8 @@ import gradio as gr
 import json
 from typing import Any
 
-from logging import getLogger
-logger = getLogger(__name__)
-
-from models.claude_chat import ClaudeChat
+from .claude_chat import ClaudeChat
+from .config import Config
 
 class UserInterface:
 
@@ -15,14 +13,11 @@ class UserInterface:
         :param client: Anthropic model class instance
         """
         self.chat = client
-        self.gui_texts = None
         self.system_prompts = None
         self.model_id = client.model
-        self.keep_selected = False
         self.pending_file_paths = []
         # ---> GUI elements:
         self.user_specification_tar = None
-        self.user_specification_tar_value = ''
         self.system_specification_tar = None
         self.chatbot = None
         self.msg = gr.Textbox()
@@ -65,7 +60,7 @@ class UserInterface:
                     ""
                 )
                 file_count = len(content) - 1  # subtract the trailing user-text block
-                label = f"📎 *[{file_count} file{'s' if file_count != 1 else '' } attached]*"
+                label = f"📎 *[{file_count} file{'s' if file_count != 1 else '' } attached]*" if file_count > 0 else ""
                 placeholder = label + (f" — {user_text}" if user_text else "")
                 display.append({"role": msg["role"], "content": placeholder})
         return display
@@ -130,12 +125,11 @@ class UserInterface:
         """
         self.pending_file_paths = []
 
-    def save_system_prompt(self, name=None, prompt=None, file:str="data/system_prompt.json"):
+    def save_system_prompt(self, name=None, prompt=None):
         """
         Save new system prompt to JSON file
         :param prompt:
         :param name:
-        :param file:
         :return:
         """
         if not name:
@@ -143,18 +137,16 @@ class UserInterface:
         if not prompt:
             raise gr.Error(f"System prompt cannot be empty! "
                            f"Enter new specification or modify existing one with a new name.")
-        # refresh system prompts (new may exist?)
-        self.get_system_prompts()
         if name in self.get_system_prompt_choices():
             raise gr.Error(f"System prompt with name '{name}' already exists! Enter unique name in the Dropdown list.")
         value = {"name": name, "type": "user", "active": True, "message": prompt}
         self.system_prompts.append(value)
-        with open(file, 'w') as f:
+        with open(Config.PROMPT_FILE_PATH, 'w') as f:
             f.write(json.dumps(self.system_prompts, indent=4))
         gr.Info(f"System prompt saved as '{name}'")
         return prompt
 
-    def deactivate_system_prompt(self, name: str, file: str = "data/system_prompt.json") -> dict[str, Any]:
+    def deactivate_system_prompt(self, name: str) -> dict[str, Any]:
         """
         Set the active flag of the selected prompt to False and save to JSON.
         :param name: name of the prompt to deactivate
@@ -172,7 +164,7 @@ class UserInterface:
                 break
         if not matched:
             raise gr.Error(f"Prompt '{name}' not found.")
-        with open(file, 'w') as f:
+        with open(Config.PROMPT_FILE_PATH, 'w') as f:
             f.write(json.dumps(self.system_prompts, indent=4))
         gr.Info(f"System prompt '{name}' deactivated.")
         return gr.update(choices=self.get_system_prompt_choices(), value=None)
@@ -180,20 +172,11 @@ class UserInterface:
     # ------------------------------------- #
     # ---> GUI build related functions <--- #
 
-    def get_gui_texts(self, file:str="data/gui_text.json"):
-        """
-        Get GUI texts from JSON file and transfer it to text dict
-        :param file: texts
-        """
-        with open(file, 'r') as f:
-            self.gui_texts = json.load(f)
-
-    def get_system_prompts(self, file:str="data/system_prompt.json"):
+    def get_system_prompts(self):
         """
         Get stored system prompts from JSON file
-        :param file: .json file containing system prompts
         """
-        with open(file, 'r') as f:
+        with open(Config.PROMPT_FILE_PATH, 'r') as f:
             self.system_prompts = json.load(f)
 
     def get_system_prompt_choices(self) -> list[str]:
@@ -201,7 +184,7 @@ class UserInterface:
         Get system prompt names to be used as Dropbox options
         :return: list of system prompt names
         """
-        self.get_gui_texts()
+        self.get_system_prompts()
         return [item["name"] for item in self.system_prompts if item["type"] == "user" and item["active"]]
 
     def refresh_system_prompt_dropdown(self, name: str) -> dict[str, Any]:
@@ -219,6 +202,7 @@ class UserInterface:
         :param selected: key selected in dropdown
         :return: message (prompt) or update of the component
         """
+        self.get_system_prompts()
         for item in self.system_prompts:
             if item["name"] == selected:
                 return item["message"]
@@ -230,8 +214,6 @@ class UserInterface:
         Build GUI with all visual elements and workflows
         :return: Gradio Blocks instance
         """
-        # read all texts for labels, placeholders etc.
-        self.get_gui_texts()
         # read stored system prompts
         self.get_system_prompts()
 
@@ -286,13 +268,13 @@ class UserInterface:
                     system_specification_apply_btn.click(
                         fn=self.set_chat_model,
                         inputs=[self.system_specification_tar, model_selection_drd],
-                        outputs=self.current_model_tbx,
-                        api_name="demo"
+                        outputs=self.current_model_tbx
                     )
 
             # Chatbot window and user prompt with file uploader
             chatbot = gr.Chatbot(
                 scale=1,
+                type='messages'
                 # reasoning_tags=[("<thinking>", "</thinking>")]
             )
 

@@ -1,5 +1,6 @@
 import base64
 import docx
+import io
 import json
 import mimetypes
 import pandas as pd
@@ -65,7 +66,7 @@ class FileProcessor:
         try:
             content = file_bytes.decode("utf-8")
         except UnicodeDecodeError:
-            content = file_bytes.decode("latin-2")
+            content = file_bytes.decode("latin-1")
 
         ext = os.path.splitext(filename)[1].lstrip(".")
         return {
@@ -133,7 +134,6 @@ class FileProcessor:
         :param filename: file name
         :return: dict with file data
         """
-        import io
         doc = docx.Document(io.BytesIO(file_bytes))
         paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
 
@@ -163,7 +163,6 @@ class FileProcessor:
         :param filename: file name
         :return: dict with file data
         """
-        import io
         xl = pd.ExcelFile(io.BytesIO(file_bytes))
         parts = [f"# Excel file: {filename}"]
 
