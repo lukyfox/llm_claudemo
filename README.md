@@ -2,6 +2,8 @@
 
 A demo application built on top of the **Anthropic Claude API**, showcasing practical AI engineering patterns in a structured, class-based Python project. Created as a hands-on companion to the [Anthropic Academy — Building with the Claude API](https://anthropic.skilljar.com/claude-with-the-anthropic-api) course.
 
+![screenshot](static/img/screen.png)
+
 ---
 
 ## Features
