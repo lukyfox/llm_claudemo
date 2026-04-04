@@ -274,7 +274,6 @@ class UserInterface:
             # Chatbot window and user prompt with file uploader
             chatbot = gr.Chatbot(
                 scale=1,
-                type='messages'
                 # reasoning_tags=[("<thinking>", "</thinking>")]
             )
 
