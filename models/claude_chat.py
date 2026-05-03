@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from anthropic._exceptions import RateLimitError
@@ -16,8 +17,9 @@ class ClaudeChat:
 
     def __init__(
             self, client:AnthropicExt, model:str,
-            user_message:str = '', system_message:str = '', parallel_tools:bool = True
+            user_message:str = '', system_message:str = '', parallel_tools:bool = True, mcp_client=None
     ):
+        self.mcp_client = mcp_client
         self.client = client
         self.model = model
         self.message = user_message
@@ -72,7 +74,27 @@ class ClaudeChat:
             {"type": "web_search_20250305", "name": "web_search"}
         ]
 
+        if self.mcp_client and self.mcp_client.tools:
+            # when mcp client instance exists and contains MCP tools, then append it to tools
+            #  - either local or MCP tools will be called if needed
+            self.tools += self.mcp_client.tools
+
+    def _is_mcp_tool(self, tool_name: str) -> bool:
+        """
+        Check if a tool name belongs to defined (connected) MCP server
+        :param tool_name: name of the called tool
+        :return: True if the tool name belongs to defined MCP server (False also if there is no MCP client instance)
+        """
+        if not self.mcp_client:
+            return False
+        return any(registered_mcp_tool["name"] == tool_name for registered_mcp_tool in self.mcp_client.tools)
+
     def add_message(self, role: str,  message: str):
+        """
+        Add a message to the chat (as dict)
+        :param role: role of the message
+        :param message: message (string) to add
+        """
         self.messages.append({'role': role, 'content': message})
 
     def set_system_message(self, message: str=None):
@@ -155,7 +177,7 @@ class ClaudeChat:
 
     def handle_tool_calls(self, tool_call) -> dict:
         """
-        Handle any user tool call (built-ins are solved by API separately)
+        Handle any user tool call (built-ins are solved by API separately) - when
         :param tool_call: ToolUseBlock from chat messages
         :return: dict of tool results
         """
@@ -168,6 +190,12 @@ class ClaudeChat:
             elif tool_call.name == "set_model_id":
                 self.set_model_id(tool_call.input.get("description"))
                 func_res = self.model
+
+            elif self.mcp_client and self._is_mcp_tool(tool_call.name):
+                try:
+                    func_res = self.mcp_client.call_tool(tool_call.name, tool_call.input)
+                except Exception as e:
+                    func_res = f"Error in MCP tool use ({tool_call.name}), details: {e.args}"
             else:
                 func_res = (f"Sorry, I cannot answer your question because I have no tool to do so "
                             f"(maybe implementation of {tool_call.name} would help?)")

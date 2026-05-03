@@ -1,6 +1,8 @@
 anthropic
+chromadb
 gradio
 ipython
+mcp
 pandas
 python-docx
 python-dotenv

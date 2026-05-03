@@ -4,6 +4,7 @@ from typing import Any
 
 from .claude_chat import ClaudeChat
 from .config import Config
+from mcp_server import server
 
 class UserInterface:
 
@@ -22,6 +23,7 @@ class UserInterface:
         self.chatbot = None
         self.msg = gr.Textbox()
         self.current_model_tbx = gr.Textbox(label="Current model", value=client.model)
+        self.run_mcp_server_btn = None
 
     # ----------------------------------------------- #
     # ---> Model and Messaging related functions <--- #
