@@ -8,13 +8,14 @@ A demo application built on top of the **Anthropic Claude API**, showcasing prac
 
 ## Features
 
-- **Automatic model selection** — selects the most suitable Claude model (Haiku / Sonnet / Opus) based on the complexity of the task, either automatically via LLM inference or manually by the user
-- **Automatic latest model IDs** — queries the Anthropic API at runtime to resolve the newest available model version, automatic selection from Haiku, Sonnet, Opus based on requirements/complexity of system prompt 
-- **Multi-turn conversation** — full chat history management with proper tool exchange buffering (tool and file calls are kept separate from the display history)
-- **Persistent system prompts** — save, load, and deactivate custom system prompts stored in JSON; select from a dropdown in the UI
-- **Tool use / Function calling** — custom tools (`get_current_model_id`, `set_model_id`) with parallel tool call support; built-in `web_search` integration
-- **Multimodal file upload** — attach and analyse files directly in the chat: Python, JS, JSON, Markdown, SQL, Jupyter notebooks (`.ipynb` with outputs), PDF, Word (`.docx`), Excel (`.xlsx`), and images
-- **Gradio UI** — browser-based interface with model selection, system prompt management, file uploader, and example prompts
+- **Automatic model selection** : selects the most suitable Claude model (Haiku / Sonnet / Opus) based on the complexity of the task, either automatically via LLM inference or manually by the user
+- **Automatic latest model IDs** : queries the Anthropic API at runtime to resolve the newest available model version, automatic selection from Haiku, Sonnet, Opus based on requirements/complexity of system prompt
+- **Multi-turn conversation** : full chat history management with proper tool exchange buffering (tool and file calls are kept separate from the display history)
+- **Persistent system prompts** : save, load, and deactivate custom system prompts stored in JSON; select from a dropdown in the UI
+- **Tool use / Function calling** : custom tools (`get_current_model_id`, `set_model_id`) with parallel tool call support; built-in `web_search` integration
+- **Multimodal file upload** : attach and analyse files directly in the chat: Python, JS, JSON, Markdown, SQL, Jupyter notebooks (`.ipynb` with outputs), PDF, Word (`.docx`), Excel (`.xlsx`), and images
+- **MCP Server and Client with RAG capabilities** : MCP tools for analyzing or indexing files - file can be persistently indexed into Chromadb database based on user request and information retrieved in future conversations, LLM completion is delegated to Client side. System prompt adapted in a way to search in indexed space first for likely personal questions
+- **Gradio UI** : browser-based interface with model selection, system prompt management, file uploader, and example prompts
 
 ---
 
@@ -27,6 +28,12 @@ llm_claudemo/
 ├── data/
 │   ├── system_prompt.json   # Persistent system prompts
 │   └── rule.json            # Strict conversation rules injected into every system message
+└── mcp_client/
+    └── client.py            # ...
+└── mcp_server/
+    ├── knowledge_base.py    # ...
+    ├── sampling.py          # ...
+    └── server.py            # ...
 └── models/
     ├── config.py            # Centralised path configuration (pathlib-based)
     ├── anthropic_ext.py     # AnthropicExt — extends Anthropic client with model selection logic
@@ -47,7 +54,7 @@ llm_claudemo/
 ## Requirements
 
 - Python 3.11+
-- Anthropic API key
+- Anthropic API key stored in .env file
 
 ---
 

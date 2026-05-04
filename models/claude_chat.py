@@ -107,8 +107,12 @@ class ClaudeChat:
             message = "You are a helpful assistant."
         with open(file=Config.RULE_FILE_PATH, mode="r", encoding="utf-8") as f:
             rules = json.load(f)
-            rules = '\n'.join(rules)
-            message += '\n' + rules
+            if not self.mcp_client:
+                # apply knowledge base rule only if MCP client instance exists
+                rules_to_apply = '\n'.join([rule for rule in rules if "<knowledge_base_instructions>" not in rule])
+            else:
+                rules_to_apply = '\n'.join(rules)
+            message += '\n' + rules_to_apply
         self.system_message = message
 
     def make_chat_round(self):
@@ -190,7 +194,6 @@ class ClaudeChat:
             elif tool_call.name == "set_model_id":
                 self.set_model_id(tool_call.input.get("description"))
                 func_res = self.model
-
             elif self.mcp_client and self._is_mcp_tool(tool_call.name):
                 try:
                     func_res = self.mcp_client.call_tool(tool_call.name, tool_call.input)
