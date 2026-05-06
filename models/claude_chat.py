@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from anthropic._exceptions import RateLimitError
@@ -16,14 +17,16 @@ class ClaudeChat:
 
     def __init__(
             self, client:AnthropicExt, model:str,
-            user_message:str = '', system_message:str = '', parallel_tools:bool = True
+            user_message:str = '', system_message:str = '', parallel_tools:bool = True, mcp_client=None
     ):
+        self.mcp_client = mcp_client
         self.client = client
         self.model = model
         self.message = user_message
         self.messages = [{'role': 'user', 'content': user_message}] if user_message else []
         self.system_message = system_message or "You are a helpful assistant."
         self._parallel_tools_appendix = ""
+        self.files_path_stack = []
         if parallel_tools:
             self._parallel_tools_appendix = ("\n<use_parallel_tool_calls>"
                                "For maximum efficiency, whenever you perform multiple independent operations, "
@@ -72,7 +75,27 @@ class ClaudeChat:
             {"type": "web_search_20250305", "name": "web_search"}
         ]
 
+        if self.mcp_client and self.mcp_client.tools:
+            # when mcp client instance exists and contains MCP tools, then append it to tools
+            #  - either local or MCP tools will be called if needed
+            self.tools += self.mcp_client.tools
+
+    def _is_mcp_tool(self, tool_name: str) -> bool:
+        """
+        Check if a tool name belongs to defined (connected) MCP server
+        :param tool_name: name of the called tool
+        :return: True if the tool name belongs to defined MCP server (False also if there is no MCP client instance)
+        """
+        if not self.mcp_client:
+            return False
+        return any(registered_mcp_tool["name"] == tool_name for registered_mcp_tool in self.mcp_client.tools)
+
     def add_message(self, role: str,  message: str):
+        """
+        Add a message to the chat (as dict)
+        :param role: role of the message
+        :param message: message (string) to add
+        """
         self.messages.append({'role': role, 'content': message})
 
     def set_system_message(self, message: str=None):
@@ -85,8 +108,12 @@ class ClaudeChat:
             message = "You are a helpful assistant."
         with open(file=Config.RULE_FILE_PATH, mode="r", encoding="utf-8") as f:
             rules = json.load(f)
-            rules = '\n'.join(rules)
-            message += '\n' + rules
+            if not self.mcp_client:
+                # apply knowledge base rule only if MCP client instance exists
+                rules_to_apply = '\n'.join([rule for rule in rules if "<knowledge_base_instructions>" not in rule])
+            else:
+                rules_to_apply = '\n'.join(rules)
+            message += '\n' + rules_to_apply
         self.system_message = message
 
     def make_chat_round(self):
@@ -94,6 +121,12 @@ class ClaudeChat:
         Run conversation - process user and assistant messages, keep history and process tools.
         """
         try:
+            if self.files_path_stack:
+                # modify system prompt to offer enclosed files for indexing via MCP tools, if requested
+                inject_file_paths = (f"\n<enclosed_file_paths>User has enclosed following files to conversation "
+                                     f"and made them available for analysis, indexing or other processing:\n"
+                                     f"{"\n".join(self.files_path_stack)}</enclosed_file_paths>")
+                self.system_message += inject_file_paths
             chat = self.client.messages.create(
                 model=self.model,
                 max_tokens=1024,
@@ -121,6 +154,13 @@ class ClaudeChat:
                 )
             response_text = "".join([item.text for item in chat.content if item.type == 'text'])
             self.add_message(chat.role, response_text)
+            # reset file paths and system prompt at the end of each completion - each file either has been indexed
+            # or commonly processed in current turn and for the next one the stack should be clear
+            self.files_path_stack = []
+            if "<enclosed_file_paths>" in self.system_message and "</enclosed_file_paths>" in self.system_message:
+                rem_start = self.system_message.index("<enclosed_file_paths>")
+                rem_end = self.system_message.index("</enclosed_file_paths>") + len("</enclosed_file_paths>")
+                self.system_message = self.system_message[:rem_start] + self.system_message[rem_end:]
         except RateLimitError as e:
             self.add_message(
                 "assistant",
@@ -155,7 +195,7 @@ class ClaudeChat:
 
     def handle_tool_calls(self, tool_call) -> dict:
         """
-        Handle any user tool call (built-ins are solved by API separately)
+        Handle any user tool call (built-ins are solved by API separately) - when
         :param tool_call: ToolUseBlock from chat messages
         :return: dict of tool results
         """
@@ -168,6 +208,11 @@ class ClaudeChat:
             elif tool_call.name == "set_model_id":
                 self.set_model_id(tool_call.input.get("description"))
                 func_res = self.model
+            elif self.mcp_client and self._is_mcp_tool(tool_call.name):
+                try:
+                    func_res = self.mcp_client.call_tool(tool_call.name, tool_call.input)
+                except Exception as e:
+                    func_res = f"Error in MCP tool use ({tool_call.name}), details: {e.args}"
             else:
                 func_res = (f"Sorry, I cannot answer your question because I have no tool to do so "
                             f"(maybe implementation of {tool_call.name} would help?)")
@@ -191,6 +236,8 @@ class ClaudeChat:
 
         for file_path in file_paths:
             result = FileProcessor.process(file_path)
+            # add file to stack for possible processing in future
+            self.files_path_stack.append(file_path)
             if result["type"] == "text_content":
                 blocks.append({
                     "type": "text",
