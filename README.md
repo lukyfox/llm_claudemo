@@ -29,11 +29,11 @@ llm_claudemo/
 │   ├── system_prompt.json   # Persistent system prompts
 │   └── rule.json            # Strict conversation rules injected into every system message
 └── mcp_client/
-    └── client.py            # ...
+    └── client.py            # MCP client for connecting to the server and calling tools
 └── mcp_server/
-    ├── knowledge_base.py    # ...
-    ├── sampling.py          # ...
-    └── server.py            # ...
+    ├── knowledge_base.py    # Knowledge base (ChromaDB) management - add, remove, list or summarize documents
+    ├── sampling.py          # Delegating the completion task back to client (document summary)
+    └── server.py            # MCP server tools functions
 └── models/
     ├── config.py            # Centralised path configuration (pathlib-based)
     ├── anthropic_ext.py     # AnthropicExt — extends Anthropic client with model selection logic

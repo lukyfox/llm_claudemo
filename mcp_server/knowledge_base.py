@@ -26,7 +26,6 @@ class KBase:
         """
         Process a file and store its chunks in the collection.
         :param file_path: Path to the file to process.
-        TODO: connect to files selected in GUI
         """
         result = FileProcessor.process(file_path)
         if result["type"] != "text_content":
