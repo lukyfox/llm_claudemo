@@ -25,7 +25,7 @@ class MCPDocumentClient:
 
         # Run event loop in new thread - this way avoids conflicts with Gradio's event loop
         future = asyncio.run_coroutine_threadsafe(self._connect(), self._loop)
-        future.result(timeout=15)  # max 15s na spuštění serveru
+        future.result(timeout=15)  # max 15s to start the server (timeout)
 
     async def _connect(self):
         server_params = StdioServerParameters(

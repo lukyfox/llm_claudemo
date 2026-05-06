@@ -26,6 +26,7 @@ class ClaudeChat:
         self.messages = [{'role': 'user', 'content': user_message}] if user_message else []
         self.system_message = system_message or "You are a helpful assistant."
         self._parallel_tools_appendix = ""
+        self.files_path_stack = []
         if parallel_tools:
             self._parallel_tools_appendix = ("\n<use_parallel_tool_calls>"
                                "For maximum efficiency, whenever you perform multiple independent operations, "
@@ -120,6 +121,12 @@ class ClaudeChat:
         Run conversation - process user and assistant messages, keep history and process tools.
         """
         try:
+            if self.files_path_stack:
+                # modify system prompt to offer enclosed files for indexing via MCP tools, if requested
+                inject_file_paths = (f"\n<enclosed_file_paths>User has enclosed following files to conversation "
+                                     f"and made them available for analysis, indexing or other processing:\n"
+                                     f"{"\n".join(self.files_path_stack)}</enclosed_file_paths>")
+                self.system_message += inject_file_paths
             chat = self.client.messages.create(
                 model=self.model,
                 max_tokens=1024,
@@ -147,6 +154,13 @@ class ClaudeChat:
                 )
             response_text = "".join([item.text for item in chat.content if item.type == 'text'])
             self.add_message(chat.role, response_text)
+            # reset file paths and system prompt at the end of each completion - each file either has been indexed
+            # or commonly processed in current turn and for the next one the stack should be clear
+            self.files_path_stack = []
+            if "<enclosed_file_paths>" in self.system_message and "</enclosed_file_paths>" in self.system_message:
+                rem_start = self.system_message.index("<enclosed_file_paths>")
+                rem_end = self.system_message.index("</enclosed_file_paths>") + len("</enclosed_file_paths>")
+                self.system_message = self.system_message[:rem_start] + self.system_message[rem_end:]
         except RateLimitError as e:
             self.add_message(
                 "assistant",
@@ -222,6 +236,8 @@ class ClaudeChat:
 
         for file_path in file_paths:
             result = FileProcessor.process(file_path)
+            # add file to stack for possible processing in future
+            self.files_path_stack.append(file_path)
             if result["type"] == "text_content":
                 blocks.append({
                     "type": "text",

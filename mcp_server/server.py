@@ -14,18 +14,19 @@ mcp = FastMCP(
     instructions=(
         "You have access to a persistent document knowledge base. "
         "Use add_document to index files, search_knowledge_base to retrieve "
-        "relevant passages, list_documents to see what is indexed, and "
-        "summarize_document to generate an AI summary via sampling."
+        "relevant passages, list_documents to see what is indexed, "
+        "summarize_document to generate an AI summary via sampling "
+        "and delete the document from database when explicitly requested."
     )
 )
-
 
 @mcp.tool()
 def add_document(file_path: str) -> str:
     """
     Index a file into the knowledge base (chroma)
     Returns a confirmation with the number of chunks stored.
-    """
+    :param file_path: Path to the file to index.
+    ]"""
     try:
         result = kb.add_document(file_path)
         return (f"Document '{result['filename']}' indexed successfully. "
@@ -86,6 +87,18 @@ def summarize_document(filename: str, focus: str = "") -> str:
         + f".\n\nContent:\n{context}"
     )
     return request_summary(mcp, prompt)
+
+@mcp.tool()
+def delete_document(filename: str) -> str:
+    """
+    Delete a document from the knowledge base.
+    :param filename: Name of the file to delete.
+    """
+    try:
+        result = kb.delete_document(filename)
+        return f"Document '{filename}' deleted - {result} chunks removed."
+    except Exception as e:
+        return f"Error deleting document {filename}, error details: {e.args}"
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
