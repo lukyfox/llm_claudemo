@@ -1,0 +1,22 @@
+services:
+  llm-claudemo:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: llm-claudemo
+    ports:
+      - "7860:7860"
+    env_file:
+      - .env
+    environment:
+      GRADIO_SERVER_NAME: "0.0.0.0"
+      GRADIO_SERVER_PORT: "7860"
+      PIP_NO_CACHE_DIR: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - chroma_data:/app/data/chroma
+    restart: unless-stopped
+
+volumes:
+  chroma_data:

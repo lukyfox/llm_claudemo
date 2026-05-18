@@ -118,6 +118,41 @@ Click any example below the chat to pre-fill the input:
 
 ---
 
+## Run with Docker
+
+This project can be run in Docker using `docker compose`.
+
+### Prerequisites
+- Docker
+- Docker Compose
+- Anthropic API key
+
+### Setup
+Create a `.env` file in the project root or remove .example extension from existing .env.example file and enter your API key:
+
+ANTHROPIC_API_KEY=your_api_key_here
+
+### Build and Run
+`docker compose up --build`
+
+The Gradio UI should then be available at `http://localhost:7860`
+
+### Run in background
+`docker compose up --build -d`
+
+### Stop the application
+`docker compose down`
+
+### Persistent data
+ChromaDB data is stored in a Docker volume named chroma_data, so the knowledge base should persist between restarts.
+
+## Notes
+The application starts the MCP server internally from within the same container.
+If you change Python dependencies, rebuild the image with:
+`docker compose up --build`
+
+---
+
 ## Related
 
 - [llm_engineering](https://github.com/lukyfox/llm_engineering) — weekly exercises from Ed Donner's LLM Engineering course (PR #1 merged into upstream, many will follow...)
