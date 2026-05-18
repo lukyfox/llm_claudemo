@@ -3,6 +3,8 @@ chromadb
 gradio
 ipython
 mcp
+openpyxl
 pandas
 python-docx
 python-dotenv
+tabulate
